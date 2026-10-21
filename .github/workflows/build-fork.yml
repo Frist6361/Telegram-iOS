@@ -45,7 +45,6 @@ jobs:
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
         run: |
           python3 -c "import json,os; cfg=json.load(open('build-system/fork-configuration.template.json')); cfg['api_id']=os.environ.get('TG_API_ID') or '0'; cfg['api_hash']=os.environ.get('TG_API_HASH') or ''; json.dump(cfg,open('build-system/fork-configuration.json','w'),indent=4)"
-          cat build-system/fork-configuration.json
 
       - name: Create canonical source directory
         run: |
