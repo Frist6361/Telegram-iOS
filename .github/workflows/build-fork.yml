@@ -50,6 +50,9 @@ jobs:
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
         run: |
           python3 -c "import json,os; cfg=json.load(open('build-system/fork-configuration.template.json')); cfg['api_id']=os.environ.get('TG_API_ID') or '0'; cfg['api_hash']=os.environ.get('TG_API_HASH') or ''; json.dump(cfg,open('build-system/fork-configuration.json','w'),indent=4)"
+          if [ "$(uname -m)" = "x86_64" ]; then
+            python3 -c "import json; v=json.load(open('versions.json')); v['bazel']='8.4.2:ce73346274c379f77880db8bd8b9c8569885fe56f19386173760949da9078df0'; json.dump(v,open('versions.json','w'),indent=4)"
+          fi
 
       - name: Create canonical source directory
         run: |
