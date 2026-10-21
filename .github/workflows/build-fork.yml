@@ -45,6 +45,18 @@ jobs:
           xcodebuild -version
           sudo xcodebuild -runFirstLaunch || true
           sudo xcodebuild -downloadComponent MetalToolchain || true
+          DMG=$(ls /System/Library/AssetsV2/com_apple_MobileAsset_MetalToolchain/*/AssetData/Restore/*.dmg 2>/dev/null | head -1)
+          if [ -n "$DMG" ]; then
+            echo "Installing Metal toolchain from $DMG"
+            MOUNT=$(hdiutil attach "$DMG" -nobrowse -readonly | tail -1 | awk '{print $3}')
+            echo "mounted at $MOUNT"
+            for PKG in $(find "$MOUNT" -maxdepth 3 -name '*.pkg'); do
+              echo "installing $PKG"
+              sudo installer -pkg "$PKG" -target / || true
+            done
+            hdiutil detach "$MOUNT" || true
+          fi
+          xcrun metal --version || true
 
       - name: Prepare configuration
         env:
