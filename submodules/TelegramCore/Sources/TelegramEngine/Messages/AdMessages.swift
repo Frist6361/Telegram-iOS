@@ -2,6 +2,7 @@ import Foundation
 import Postbox
 import SwiftSignalKit
 import TelegramApi
+import SGSimpleSettings
 
 private class AdMessagesHistoryContextImpl {
     final class CachedMessage: Equatable, Codable {
@@ -481,6 +482,11 @@ private class AdMessagesHistoryContextImpl {
             return
         }
         self.isActivated = true
+        
+        if SGSimpleSettings.shared.disableSponsoredMessages {
+            self.stateValue = State(interPostInterval: nil, startDelay: nil, betweenDelay: nil, messages: [])
+            return
+        }
         
         let peerId = self.peerId
         let accountPeerId = self.account.peerId

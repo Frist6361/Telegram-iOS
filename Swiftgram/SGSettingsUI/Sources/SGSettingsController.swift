@@ -27,6 +27,7 @@ import UndoUI
 
 private enum SGControllerSection: Int32, SGItemListSection {
     case search
+    case fork
     case trending
     case content
     case tabs
@@ -106,6 +107,9 @@ private enum SGBoolSetting: String {
     case nyStyleSnow
     case nyStyleLightning
     case tabBarSearchEnabled
+    case ghostMode
+    case localPremium
+    case disableSponsoredMessages
 }
 
 private enum SGOneFromManySetting: String {
@@ -150,6 +154,13 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     let id = SGItemListCounter()
     
     entries.append(.searchInput(id: id.count, section: .search, title: NSAttributedString(string: "🔍"), text: state.searchQuery ?? "", placeholder: strings.Common_Search))
+    
+    entries.append(.header(id: id.count, section: .fork, text: "MyGram", badge: newStr))
+    entries.append(.toggle(id: id.count, section: .fork, settingName: .ghostMode, value: SGSimpleSettings.shared.ghostMode, text: "Ghost mode", enabled: true))
+    entries.append(.notice(id: id.count, section: .fork, text: "Stay offline: no online status, no typing and no read receipts are sent."))
+    entries.append(.toggle(id: id.count, section: .fork, settingName: .localPremium, value: SGSimpleSettings.shared.localPremium, text: "Local Premium", enabled: true))
+    entries.append(.notice(id: id.count, section: .fork, text: "Unlocks client-side Premium features. Server-side perks remain locked."))
+    entries.append(.toggle(id: id.count, section: .fork, settingName: .disableSponsoredMessages, value: SGSimpleSettings.shared.disableSponsoredMessages, text: "Disable sponsored messages", enabled: true))
     
     
     if SGSimpleSettings.shared.canUseNY {
@@ -521,6 +532,14 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
         case .nyStyleLightning:
             SGSimpleSettings.shared.nyStyle = value ? SGSimpleSettings.NYStyle.lightning.rawValue : SGSimpleSettings.NYStyle.default.rawValue
             simplePromise.set(true) // Trigger update for 'enabled' field of other toggles
+        case .ghostMode:
+            SGSimpleSettings.shared.ghostMode = value
+        case .localPremium:
+            SGSimpleSettings.shared.localPremium = value
+            askForRestart?()
+        case .disableSponsoredMessages:
+            SGSimpleSettings.shared.disableSponsoredMessages = value
+            askForRestart?()
         }
     }, updateSliderValue: { setting, value in
         switch (setting) {

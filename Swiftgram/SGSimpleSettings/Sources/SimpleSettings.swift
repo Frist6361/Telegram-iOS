@@ -176,6 +176,10 @@ public class SGSimpleSettings {
         case warnOnStoriesOpen
         case showProfileId
         case sendWithReturnKey
+        // MyGram fork
+        case ghostMode
+        case localPremium
+        case disableSponsoredMessages
     }
     
     public enum DownloadSpeedBoostValues: String, CaseIterable {
@@ -328,7 +332,10 @@ public class SGSimpleSettings {
         Keys.hideStories.rawValue: false,
         Keys.warnOnStoriesOpen.rawValue: false,
         Keys.showProfileId.rawValue: true,
-        Keys.sendWithReturnKey.rawValue: false
+        Keys.sendWithReturnKey.rawValue: false,
+        Keys.ghostMode.rawValue: false,
+        Keys.localPremium.rawValue: false,
+        Keys.disableSponsoredMessages.rawValue: false
     ]
     
     public static let groupDefaultValues: [String: Any] = [
@@ -556,6 +563,15 @@ public class SGSimpleSettings {
 
     @UserDefault(key: Keys.sendWithReturnKey.rawValue)
     public var sendWithReturnKey: Bool
+
+    @UserDefault(key: Keys.ghostMode.rawValue)
+    public var ghostMode: Bool
+
+    @UserDefault(key: Keys.localPremium.rawValue)
+    public var localPremium: Bool
+
+    @UserDefault(key: Keys.disableSponsoredMessages.rawValue)
+    public var disableSponsoredMessages: Bool
     
     @UserDefault(key: Keys.pinnedMessageNotifications.rawValue, userDefaults: UserDefaults(suiteName: APP_GROUP_IDENTIFIER) ?? .standard)
     public var pinnedMessageNotifications: String
