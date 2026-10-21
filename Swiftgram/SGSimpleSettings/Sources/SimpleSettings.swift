@@ -180,6 +180,7 @@ public class SGSimpleSettings {
         case ghostMode
         case localPremium
         case disableSponsoredMessages
+        case keepDeletedMessages
     }
     
     public enum DownloadSpeedBoostValues: String, CaseIterable {
@@ -335,7 +336,8 @@ public class SGSimpleSettings {
         Keys.sendWithReturnKey.rawValue: false,
         Keys.ghostMode.rawValue: false,
         Keys.localPremium.rawValue: false,
-        Keys.disableSponsoredMessages.rawValue: false
+        Keys.disableSponsoredMessages.rawValue: false,
+        Keys.keepDeletedMessages.rawValue: false
     ]
     
     public static let groupDefaultValues: [String: Any] = [
@@ -572,6 +574,9 @@ public class SGSimpleSettings {
 
     @UserDefault(key: Keys.disableSponsoredMessages.rawValue)
     public var disableSponsoredMessages: Bool
+
+    @UserDefault(key: Keys.keepDeletedMessages.rawValue)
+    public var keepDeletedMessages: Bool
     
     @UserDefault(key: Keys.pinnedMessageNotifications.rawValue, userDefaults: UserDefaults(suiteName: APP_GROUP_IDENTIFIER) ?? .standard)
     public var pinnedMessageNotifications: String

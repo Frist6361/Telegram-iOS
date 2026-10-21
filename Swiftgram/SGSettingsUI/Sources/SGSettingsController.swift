@@ -110,6 +110,7 @@ private enum SGBoolSetting: String {
     case ghostMode
     case localPremium
     case disableSponsoredMessages
+    case keepDeletedMessages
 }
 
 private enum SGOneFromManySetting: String {
@@ -161,6 +162,8 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     entries.append(.toggle(id: id.count, section: .fork, settingName: .localPremium, value: SGSimpleSettings.shared.localPremium, text: "Local Premium", enabled: true))
     entries.append(.notice(id: id.count, section: .fork, text: "Unlocks client-side Premium features. Server-side perks remain locked."))
     entries.append(.toggle(id: id.count, section: .fork, settingName: .disableSponsoredMessages, value: SGSimpleSettings.shared.disableSponsoredMessages, text: "Disable sponsored messages", enabled: true))
+    entries.append(.toggle(id: id.count, section: .fork, settingName: .keepDeletedMessages, value: SGSimpleSettings.shared.keepDeletedMessages, text: "Keep deleted messages", enabled: true))
+    entries.append(.notice(id: id.count, section: .fork, text: "Incoming messages stay in your chat after the other side deletes them."))
     
     
     if SGSimpleSettings.shared.canUseNY {
@@ -539,6 +542,9 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
             askForRestart?()
         case .disableSponsoredMessages:
             SGSimpleSettings.shared.disableSponsoredMessages = value
+            askForRestart?()
+        case .keepDeletedMessages:
+            SGSimpleSettings.shared.keepDeletedMessages = value
             askForRestart?()
         }
     }, updateSliderValue: { setting, value in
