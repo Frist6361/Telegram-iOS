@@ -102,13 +102,15 @@ jobs:
         run: |
           cd /Users/Shared/telegram-ios
           mkdir -p build/artifacts
-          for f in bazel-out/applebin_ios-ios_arm*-opt-ST-*/bin/Telegram/Telegram.ipa; do
-            cp "$f" build/artifacts/
+          for f in bazel-bin/Telegram/*.ipa bazel-out/applebin_ios-ios_arm*-opt-ST-*/bin/Telegram/*.ipa; do
+            if [ -f "$f" ]; then
+              cp "$f" build/artifacts/
+            fi
           done
           ls -lh build/artifacts
 
       - uses: actions/upload-artifact@v4
         with:
           name: Telegram-unsigned-ipa
-          path: /Users/Shared/telegram-ios/build/artifacts/Telegram.ipa
+          path: /Users/Shared/telegram-ios/build/artifacts/*.ipa
           if-no-files-found: error
