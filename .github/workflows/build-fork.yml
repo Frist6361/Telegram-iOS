@@ -44,15 +44,20 @@ jobs:
           fi
           xcodebuild -version
           sudo xcodebuild -runFirstLaunch || true
-          for attempt in 1 2 3 4; do
-            sudo xcodebuild -downloadComponent MetalToolchain || true
-            if xcrun metal --version >/dev/null 2>&1; then
-              echo "Metal toolchain ready (attempt $attempt)"
-              break
+          sudo xcodebuild -downloadComponent MetalToolchain || true
+          if ! xcrun metal --version >/dev/null 2>&1; then
+            DMG=$(ls /System/Library/AssetsV2/com_apple_MobileAsset_MetalToolchain/*/AssetData/Restore/*.dmg 2>/dev/null | head -1)
+            if [ -n "$DMG" ]; then
+              echo "Installing Metal toolchain from $DMG"
+              MOUNT=$(hdiutil attach "$DMG" -nobrowse -readonly | tail -1 | awk '{print $3}')
+              echo "mounted at $MOUNT"
+              for PKG in $(find "$MOUNT" -name '*.pkg'); do
+                echo "installing $PKG"
+                sudo installer -pkg "$PKG" -target / || true
+              done
+              hdiutil detach "$MOUNT" || true
             fi
-            echo "Metal toolchain not ready yet (attempt $attempt), retrying"
-            sleep 15
-          done
+          fi
           xcrun metal --version || true
 
       - name: Prepare configuration
