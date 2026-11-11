@@ -1,0 +1,152 @@
+name: Run in Simulator
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'Runner label'
+        required: false
+        default: 'macos-26'
+      configuration:
+        description: 'Bazel configuration'
+        required: false
+        default: 'release_sim_arm64'
+
+permissions:
+  contents: read
+
+jobs:
+  sim:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 360
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /usr/local/share/dotnet || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+          sudo rm -rf /usr/local/var/homebrew || true
+          sudo rm -rf /Applications/Microsoft\ Edge.app || true
+          sudo rm -rf /Applications/Google\ Chrome.app || true
+          sudo rm -rf ~/Library/Caches/* || true
+          df -h /
+
+      - name: Select Xcode
+        run: |
+          ls /Applications | grep -i Xcode || true
+          if [ -d /Applications/Xcode_26.2.app ]; then
+            sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
+          else
+            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          fi
+          xcodebuild -version
+          sudo xcodebuild -runFirstLaunch || true
+          xcrun metal --version || true
+
+      - name: Prepare configuration
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+        run: |
+          python3 -c "import json,os; cfg=json.load(open('build-system/fork-configuration.template.json')); cfg['api_id']=os.environ.get('TG_API_ID') or '0'; cfg['api_hash']=os.environ.get('TG_API_HASH') or ''; json.dump(cfg,open('build-system/fork-configuration.json','w'),indent=4)"
+
+      - name: Create canonical source directory
+        run: |
+          sudo mkdir -p /Users/Shared
+          cp -R "$GITHUB_WORKSPACE" /Users/Shared/
+          mv /Users/Shared/$(basename "$GITHUB_WORKSPACE") /Users/Shared/telegram-ios
+
+      - name: Build for simulator
+        run: |
+          set -x
+          SOURCE_DIR=/Users/Shared/telegram-ios
+          BAZEL_USER_ROOT=/private/var/tmp/_bazel_containerhost
+          cd "$SOURCE_DIR"
+          BUILD_NUMBER_OFFSET="$(cat build_number_offset)"
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          BUILD_NUMBER=$((COMMIT_COUNT + BUILD_NUMBER_OFFSET))
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          python3 -u build-system/Make/Make.py \
+            --bazelUserRoot="$BAZEL_USER_ROOT" \
+            --overrideXcodeVersion \
+            build \
+            --configurationPath="build-system/fork-configuration.json" \
+            --codesigningInformationPath=build-system/fake-codesigning \
+            --configuration=${{ inputs.configuration }} \
+            --buildNumber="$BUILD_NUMBER"
+
+      - name: Locate app bundle
+        run: |
+          cd /Users/Shared/telegram-ios
+          mkdir -p /Users/Shared/artifacts
+          find bazel-bin -maxdepth 5 -name '*.app' -type d | tee /tmp/apps.txt
+          APP=$(grep -m1 '/Swiftgram.app$' /tmp/apps.txt || head -1 /tmp/apps.txt)
+          echo "APP=$APP" >> "$GITHUB_ENV"
+          echo "chosen: $APP"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist" > /tmp/bid.txt
+          cat /tmp/bid.txt
+          echo "BUNDLE_ID=$(cat /tmp/bid.txt)" >> "$GITHUB_ENV"
+
+      - name: Boot simulator and install
+        run: |
+          set -x
+          A=/Users/Shared/artifacts
+          xcrun simctl list devices available
+          DEV=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; c=[x['udid'] for rt in d for x in d[rt] if x['name'].startswith('iPhone')]; print(c[0] if c else '')")
+          if [ -z "$DEV" ]; then
+            sudo xcodebuild -downloadPlatform iOS || true
+            DEV=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; c=[x['udid'] for rt in d for x in d[rt] if x['name'].startswith('iPhone')]; print(c[0] if c else '')")
+          fi
+          echo "DEVICE=$DEV" >> "$GITHUB_ENV"
+          echo "device: $DEV"
+          xcrun simctl boot "$DEV" || true
+          xcrun simctl bootstatus "$DEV" -b || true
+          xcrun simctl install "$DEV" "$APP"
+          xcrun simctl listapps "$DEV" | grep -A3 -i swiftgram | head -20 || true
+
+      - name: Launch and capture
+        run: |
+          set -x
+          A=/Users/Shared/artifacts
+          xcrun simctl spawn "$DEVICE" log stream --style compact --level debug \
+            --predicate 'process == "Swiftgram" OR eventMessage CONTAINS[c] "swiftgram"' \
+            > "$A/sim-app.log" 2>&1 &
+          LOGPID=$!
+          sleep 3
+          xcrun simctl io "$DEVICE" screenshot "$A/shot_00_before.png" || true
+          nohup xcrun simctl launch --console-pty "$DEVICE" "$BUNDLE_ID" > "$A/app-console.log" 2>&1 &
+          for i in 1 2 3 4 5 6; do
+            sleep 10
+            xcrun simctl io "$DEVICE" screenshot "$A/shot_$i.png" || true
+          done
+          PID=$(pgrep -f 'Swiftgram.app/Swiftgram' | head -1 || true)
+          echo "app pid: $PID"
+          if [ -n "$PID" ]; then
+            sample "$PID" 3 -file "$A/sample.txt" || true
+            lldb --batch -p "$PID" -o 'thread backtrace all' -o 'detach' -o 'quit' > "$A/lldb-bt.txt" 2>&1 || true
+          fi
+          sleep 20
+          for i in 7 8; do
+            xcrun simctl io "$DEVICE" screenshot "$A/shot_$i.png" || true
+            sleep 10
+          done
+          kill $LOGPID || true
+          xcrun simctl spawn "$DEVICE" log collect --last 5m /tmp/sim.logarchive || true
+          cp -R /tmp/sim.logarchive "$A/" 2>/dev/null || true
+          ls -la ~/Library/Logs/DiagnosticReports 2>/dev/null | head -20 || true
+          cp ~/Library/Logs/DiagnosticReports/*.ips "$A/" 2>/dev/null || true
+          ls -la "$A"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: simulator-run
+          path: /Users/Shared/artifacts
+          if-no-files-found: warn
